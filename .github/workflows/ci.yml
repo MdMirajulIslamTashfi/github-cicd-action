@@ -99,3 +99,32 @@ jobs:
           name: app-jar                     # the name of the artifact shown in the Actions tab
           path: build/libs/*.jar            # Spring Boot places the built JAR here
           retention-days: 7                 # GitHub will delete this artifact after 7 days
+
+# JOB 4: DEPLOY (CD)
+# Runs after package succeeds AND only on push to main (not on pull requests, you don't want to publish unmerged code).
+# Builds a Docker image and pushes it to Docker Hub.
+  deploy:
+    runs-on: ubuntu-latest        # Docker CLI is already available on ubuntu-latest, no container needed
+    needs: package                # only runs if package job passes
+    if: github.event_name == 'push'   # skip this job on pull requests, only deploy real merges
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4     # need the Dockerfile and source to build the image
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3  # official Docker action to authenticate with Docker Hub
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}   # pulled from GitHub Secrets (set this up below)
+          password: ${{ secrets.DOCKERHUB_TOKEN }}      # Docker Hub access token, not your password
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/gitlab-cicd-application:latest .
+          # builds the image using your Dockerfile and tags it as:
+          # your-dockerhub-username/gitlab-cicd-application:latest
+
+      - name: Push Docker image to Docker Hub
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/gitlab-cicd-application:latest
+          # pushes the tagged image to your Docker Hub repository
