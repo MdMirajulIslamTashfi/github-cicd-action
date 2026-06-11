@@ -1,0 +1,69 @@
+name: build and test pipeline
+
+# Triggers:
+# Defines when this pipeline run
+# It will run on every push or pull request targeting the main branch
+on:
+  push:
+    branches:
+      - main # run when code is pushed to main
+  pull_request:
+    branches:
+      - main # run when a pull request is opened against main
+jobs:
+  # Job 1: Build
+  # This job compiles the Java source code to check for any compilation error before running tests
+  build:
+    runs-on: ubuntu-latest   # the host machine that will run the container
+    container:
+      image: eclipse-temurin:21-jdk-alpine # lightweight Alpine-based Java 21 container
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4     # pulls repo code into the container
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4        # caches downloaded dependencies to speed up future runs
+        with:
+          path: |
+            ~/.gradle/caches          # where Gradle stores downloaded libraries
+            ~/.gradle/wrapper         # where Gradle stores the wrapper binary
+          key: gradle-${{ hashFiles('**/*.gradle') }}   # cache key based on your Gradle files,
+                                                        # so cache refreshes only when Gradle files change
+      - name: Compile
+        run: |
+          chmod +x ./gradlew           # make the Gradle wrapper script executable
+          ./gradlew compileJava        # compile all Java source files under src/main/java
+
+  # JOB 2: TEST
+  # This job runs after build succeeds.
+  # It executes all JUnit tests and uploads an HTML test report as an artifact so you can download and inspect it from the Actions tab.
+  test:
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:21-jdk-alpine
+    needs: build # this job will only start if the build job passes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4     # re-checkout is needed since each job runs in a fresh container
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle') }}   # same key as build job so it reuses the cache
+
+      - name: Run tests
+        run: |
+          chmod +x ./gradlew          # make the Gradle wrapper script executable
+          ./gradlew test              # run all JUnit tests under src/test/java
+
+      - name: Upload test report
+        uses: actions/upload-artifact@v4    # saves the test report so you can download it from GitHub UI
+        if: always()                        # run this step even if the tests fail, so you can see why
+        with:
+          name: test-report                 # the name of the artifact shown in the Actions tab
+          path: build/reports/tests/        # Gradle generates an HTML report here after running tests
+          retention-days: 7                 # GitHub will delete this artifact after 7 days
