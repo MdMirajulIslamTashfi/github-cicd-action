@@ -5,12 +5,14 @@
 # ─────────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jdk-alpine AS builder
 
-WORKDIR /app                        # set working directory inside the container
+# set working directory inside the container
+WORKDIR /app
 
-COPY . .                            # copy entire project into the container
-
+COPY . .
+# copy entire project into the container
+# build the fat JAR, --no-daemon avoids background Gradle process
 RUN chmod +x ./gradlew && \
-    ./gradlew bootJar --no-daemon   # build the fat JAR, --no-daemon avoids background Gradle process
+    ./gradlew bootJar --no-daemon
 
 # ─────────────────────────────────────────────────────────────────
 # STAGE 2: RUNTIME STAGE
@@ -18,11 +20,11 @@ RUN chmod +x ./gradlew && \
 # This keeps the final image as small as possible.
 # ─────────────────────────────────────────────────────────────────
 FROM eclipse-temurin:21-jre-alpine
-
-WORKDIR /app                        # set working directory inside the container
-
-COPY --from=builder /app/build/libs/*.jar app.jar   # copy only the built JAR from the builder stage
-
-EXPOSE 8080                         # document that the app runs on port 8080
-
-ENTRYPOINT ["java", "-jar", "app.jar"]  # command to run when the container starts
+# set working directory inside the container
+WORKDIR /app
+# copy only the built JAR from the builder stage
+COPY --from=builder /app/build/libs/*.jar app.jar
+# document that the app runs on port 8080
+EXPOSE 8080
+# command to run when the container starts
+ENTRYPOINT ["java", "-jar", "app.jar"]
