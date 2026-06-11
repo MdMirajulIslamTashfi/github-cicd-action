@@ -67,3 +67,35 @@ jobs:
           name: test-report                 # the name of the artifact shown in the Actions tab
           path: build/reports/tests/        # Gradle generates an HTML report here after running tests
           retention-days: 7                 # GitHub will delete this artifact after 7 days
+
+# JOB 3: PACKAGE
+# This job runs after all tests pass. It builds the final executable fat JAR using Spring Boot's bootJar task and uploads it as a downloadable artifact
+  package:
+    runs-on: ubuntu-latest
+    container:
+      image: eclipse-temurin:21-jdk-alpine
+    needs: test               # this job will only start if the test job passes
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4     # re-checkout for the same reason as the test job
+
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ hashFiles('**/*.gradle') }}   # reuses the same cache built in the first job
+
+      - name: Build JAR
+        run: |
+          chmod +x ./gradlew          # make the Gradle wrapper script executable
+          ./gradlew bootJar           # builds an executable fat JAR containing your app + all dependencies
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4    # saves the JAR so you can download it from the Actions tab
+        with:
+          name: app-jar                     # the name of the artifact shown in the Actions tab
+          path: build/libs/*.jar            # Spring Boot places the built JAR here
+          retention-days: 7                 # GitHub will delete this artifact after 7 days
